@@ -138,13 +138,13 @@ def fix_branches(hg_repo):
             amended_commits[head['hash']] = new_hash
     return amended_commits
 
-def convert(hg_repo_copy, git_repo, fast_export_args, bash):
+def convert(hg_repo_copy, git_repo, fast_export_args):
     env = os.environ.copy()
     env['PYTHON'] = sys.executable
     env['PATH'] = FAST_EXPORT_DIR + os.pathsep + env.get('PATH', '')
     env['HGENCODING'] = 'UTF-8'
     subprocess.check_call(
-        [bash, 'hg-fast-export.sh', '-r', hg_repo_copy] + fast_export_args,
+        ['sh', 'hg-fast-export.sh', '-r', hg_repo_copy] + fast_export_args,
         env=env,
         cwd=git_repo,
     )
@@ -165,7 +165,7 @@ def update_notes(git_repo, amended_commits):
         cmd = ['git', 'notes', '--ref', 'hg', 'add', git_hash, '-m', orig_hg_hash]
         subprocess.check_call(cmd, cwd=git_repo)
 
-def process_repo(hg_repo, git_repo, fast_export_args, bash):
+def process_repo(hg_repo, git_repo, fast_export_args):
 
     url_split = git_repo.split("/")
     repo_name = url_split[-1].split(".")[0]
@@ -183,7 +183,8 @@ def process_repo(hg_repo, git_repo, fast_export_args, bash):
     hg_repo_copy = copy_hg_repo(hg_repo)
     try:
         amended_commits = fix_branches(hg_repo_copy)
-        convert(hg_repo_copy, temp_git_repo, fast_export_args, bash)
+        # convert(hg_repo_copy, temp_git_repo, fast_export_args, bash)
+        convert(hg_repo_copy, temp_git_repo, fast_export_args)
         if amended_commits and '--hg-hash' in fast_export_args:
             update_notes(temp_git_repo, amended_commits)
         if '--hg-hash' in fast_export_args:
@@ -260,27 +261,17 @@ def new_git_repo(git_repo):
 
 
 def main():
-    for i, arg in enumerate(sys.argv[:]):
-        if arg.startswith('--bash'):
-            del sys.argv[i]
-            BASH = arg.split('=', 1)[1]
-            break
-        # elif arg.startswith('--hg-id'):
-        #     del sys.argv[i]
-        #     hg_id = arg.split("=", 1)[1]
-        # elif arg.startswith('--hg-pass'):
-        #     del sys.argv[i]
-        #     hg_password = arg.split("=", 1)[1]
-    else:
-        if os.name == 'nt':
-            msg = "Missing --bash command line argument with path to git bash\n"
-            sys.stderr.write(msg)
-            sys.exit(1)
-        BASH = '/bin/bash'
-        if hg_id is None or hg_password is None:
-            msg = "Missing --id or --pass for hg repo, please provide the credentials\n"
-            sys.stderr.write(msg)
-            sys.exit(1)
+    # for i, arg in enumerate(sys.argv[:]):
+    #     if arg.startswith('--bash'):
+    #         del sys.argv[i]
+    #         BASH = arg.split('=', 1)[1]
+    #         break
+    # else:
+    #     if os.name == 'nt':
+    #         msg = "Missing --bash command line argument with path to git bash\n"
+    #         sys.stderr.write(msg)
+    #         sys.exit(1)
+    #     BASH = '/bin/bash'
 
     try:
         arglist = sys.argv
@@ -354,13 +345,20 @@ def main():
     #     fast_export_args,
     #     BASH
     # )
+    # git_repo_path = process_repo(
+    #     # Interpret the paths as relative to basedir - will do nothing if they were
+    #     # already absolute paths:
+    #     os.path.join(gettempdir(), cloned_hg_repo),
+    #     git_repo,
+    #     fast_export_args,
+    #     BASH
+    # )
     git_repo_path = process_repo(
         # Interpret the paths as relative to basedir - will do nothing if they were
         # already absolute paths:
         os.path.join(gettempdir(), cloned_hg_repo),
         git_repo,
-        fast_export_args,
-        BASH
+        fast_export_args
     )
     git_repo_name = os.path.basename(git_repo_path)
     print(gettempdir(), "  ", git_repo_path, git_repo_name)
