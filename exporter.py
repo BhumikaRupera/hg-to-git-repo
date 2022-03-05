@@ -166,11 +166,20 @@ def update_notes(git_repo, amended_commits):
         subprocess.check_call(cmd, cwd=git_repo)
 
 def process_repo(hg_repo, git_repo, fast_export_args, bash):
-    if os.path.exists(git_repo):
+
+    url_split = git_repo.split("/")
+    repo_name = url_split[-1].split(".")[0]
+
+    git_repo_path = os.path.join(
+        gettempdir(), repo_name
+    )
+    print("\nInside process: git_repo_path - ", git_repo_path, "\n")
+    if os.path.exists(git_repo_path):
         msg = "git repo {} already exists, skipping.\n"
-        sys.stderr.write(msg.format(git_repo))
+        sys.stderr.write(msg.format(git_repo_path))
         return
-    temp_git_repo = init_git_repo(git_repo)
+    # temp_git_repo = init_git_repo(git_repo)
+    temp_git_repo = new_git_repo(git_repo)
     hg_repo_copy = copy_hg_repo(hg_repo)
     try:
         amended_commits = fix_branches(hg_repo_copy)
@@ -179,7 +188,8 @@ def process_repo(hg_repo, git_repo, fast_export_args, bash):
             update_notes(temp_git_repo, amended_commits)
         if '--hg-hash' in fast_export_args:
             verify_conversion(hg_repo, temp_git_repo)
-        shutil.copytree(temp_git_repo, git_repo)
+        shutil.copytree(temp_git_repo, git_repo_path)
+        return git_repo_path
     finally:
         shutil.rmtree(temp_git_repo, onerror=remove_readonly)
         shutil.rmtree(hg_repo_copy, onerror=remove_readonly)
@@ -209,6 +219,45 @@ def verify_conversion(hg_repo, git_repo):
             sys.stderr.write('hg hash %s has no corresponding git commit\n' % hg_hash)
         raise
 
+def clone_repo_from_url(hg_repo, id, password):
+    """Make a new hg repo in a temporary directory, and return its path"""
+    url_split = hg_repo.split("/")
+    repo_name = url_split[-1]
+    url_split_hg = hg_repo.split("//")
+    repo_url = url_split_hg[-1]
+    print(repo_url)
+
+    random_hex = hexlify(os.urandom(16)).decode()
+    temp_repo = os.path.join(
+        gettempdir(), repo_name + '-' + random_hex
+    )
+    mkdir_p(temp_repo)
+    hg_repo_url = "http://" + id + ":" + password + "@" + repo_url
+    print(hg_repo_url)
+    # hg_repo_url = "http://t0251371:t025@Thales@"+repo_url
+    subprocess.check_call(['hg', 'clone', hg_repo_url, temp_repo])
+    # subprocess.check_call(['git', 'config', 'core.ignoreCase', 'false'], cwd=temp_repo)
+    return temp_repo
+
+    # cmd = ['hg', 'clone', 'hg_repo' 'hg_repo']
+    # output = subprocess.check_output(cmd, cwd=hg_repo)
+
+def new_git_repo(git_repo):
+    """Make a new git repo in a temporary directory, and return its path"""
+    url_split = git_repo.split("/")
+    repo_name = url_split[-1].split(".")[0]
+
+    random_hex = hexlify(os.urandom(16)).decode()
+    temp_repo = os.path.join(
+        gettempdir(), repo_name + '-' + random_hex
+    )
+    mkdir_p(temp_repo)
+    subprocess.check_call(['git', 'init', temp_repo])
+    subprocess.check_call(['git', 'config', 'core.ignoreCase', 'false'], cwd=temp_repo)
+    print("\nInside new_git_repo: new_repo_path - ", temp_repo, "\n")
+
+    return temp_repo
+
 
 def main():
     for i, arg in enumerate(sys.argv[:]):
@@ -216,26 +265,72 @@ def main():
             del sys.argv[i]
             BASH = arg.split('=', 1)[1]
             break
+        # elif arg.startswith('--hg-id'):
+        #     del sys.argv[i]
+        #     hg_id = arg.split("=", 1)[1]
+        # elif arg.startswith('--hg-pass'):
+        #     del sys.argv[i]
+        #     hg_password = arg.split("=", 1)[1]
     else:
         if os.name == 'nt':
             msg = "Missing --bash command line argument with path to git bash\n"
             sys.stderr.write(msg)
             sys.exit(1)
         BASH = '/bin/bash'
+        if hg_id is None or hg_password is None:
+            msg = "Missing --id or --pass for hg repo, please provide the credentials\n"
+            sys.stderr.write(msg)
+            sys.exit(1)
+
     try:
-        REPO_MAPPING_FILE = sys.argv[1]
+        arglist = sys.argv
+        for i, arg in enumerate(arglist[:]):
+            if arg.startswith('--hg-user'):
+                hg_user = arg.split("=", 1)[1]
+                j = arglist.index(arg)
+                del arglist[j]
+            elif arg.startswith('--hg-pass'):
+                hg_password = arg.split("=", 1)[1]
+                j = arglist.index(arg)
+                del arglist[j]
+            elif arg.startswith('--git-user'):
+                git_user = arg.split("=", 1)[1]
+                j = arglist.index(arg)
+                del arglist[j]
+            elif arg.startswith('--git-token'):
+                git_token = arg.split("=", 1)[1]
+                j = arglist.index(arg)
+                del arglist[j]
+            elif arg.startswith('--git-repo'):
+                git_repo = arg.split("=", 1)[1]
+                j = arglist.index(arg)
+                del arglist[j]
+            elif arg.startswith('--hg-repo'):
+                hg_repo = arg.split("=", 1)[1]
+                j = arglist.index(arg)
+                del arglist[j]
+        else:
+            if hg_user is None or hg_password is None:
+                msg = "Missing --hg-id or --hg-pass for hg repo, please provide the credentials\n"
+                sys.stderr.write(msg)
+                sys.exit(1)
+            if git_user is None or git_token is None:
+                msg = "Missing --git-user or --git-token for hg repo, please provide the credentials\n"
+                sys.stderr.write(msg)
+                sys.exit(1)
+        # REPO_MAPPING_FILE = sys.argv[1]
     except IndexError:
         msg = "Error: no REPO_MAPPING_FILE passed as command line argument\n"
         sys.stderr.write(msg)
         sys.exit(1)
 
-    fast_export_args = sys.argv[2:]
+    fast_export_args = sys.argv[1:]
 
-    REPO_MAPPING_FILE = os.path.abspath(REPO_MAPPING_FILE)
-    basedir = os.path.dirname(REPO_MAPPING_FILE)
-
-    with open(REPO_MAPPING_FILE) as f:
-        repo_mapping = json.load(f)
+    # REPO_MAPPING_FILE = os.path.abspath(REPO_MAPPING_FILE)
+    # basedir = os.path.dirname(REPO_MAPPING_FILE)
+    #
+    # with open(REPO_MAPPING_FILE) as f:
+    #     repo_mapping = json.load(f)
 
     for i, arg in enumerate(fast_export_args):
         # Quick and dirty, if any args are filepaths, convert to absolute paths:
@@ -245,15 +340,36 @@ def main():
             global DEFAULT_BRANCH
             DEFAULT_BRANCH = fast_export_args[i + 1]
 
-    for hg_repo, git_repo in repo_mapping.items():
-        process_repo(
-            # Interpret the paths as relative to basedir - will do nothing if they were
-            # already absolute paths:
-            os.path.join(basedir, hg_repo),
-            os.path.join(basedir, git_repo),
-            fast_export_args,
-            BASH
-        )
+    # print("\n cd---- \n")
+    # os.chdir()
+    # subprocess.call('cd', 'ota-emp-management-2f71d7c5c3b843955cb40df8a9011bb1', shell=True)
+    # print("\n" + gettempdir())
+    # for hg_repo, git_repo in repo_mapping.items():
+    cloned_hg_repo = clone_repo_from_url(hg_repo, hg_user, hg_password)
+    # process_repo(
+    #     # Interpret the paths as relative to basedir - will do nothing if they were
+    #     # already absolute paths:
+    #     os.path.join(basedir, hg_repo),
+    #     os.path.join(basedir, git_repo),
+    #     fast_export_args,
+    #     BASH
+    # )
+    git_repo_path = process_repo(
+        # Interpret the paths as relative to basedir - will do nothing if they were
+        # already absolute paths:
+        os.path.join(gettempdir(), cloned_hg_repo),
+        git_repo,
+        fast_export_args,
+        BASH
+    )
+    git_repo_name = os.path.basename(git_repo_path)
+    print(gettempdir(), "  ", git_repo_path, git_repo_name)
+    git_repo_url_short = git_repo.split("//")[1]
+    git_repo_url = "https://" + git_user + ":" + git_token + "@" + git_repo_url_short
+    os.chdir(git_repo_path)
+    subprocess.check_call(['git', 'remote', 'add', 'origin', git_repo_url])
+    subprocess.check_call(['git', 'push', '-u' 'origin', '--all'])
+
 
 if __name__ == '__main__':
     main()
