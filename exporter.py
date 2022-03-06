@@ -143,8 +143,13 @@ def convert(hg_repo_copy, git_repo, fast_export_args):
     env['PYTHON'] = sys.executable
     env['PATH'] = FAST_EXPORT_DIR + os.pathsep + env.get('PATH', '')
     env['HGENCODING'] = 'UTF-8'
+    # subprocess.check_call(
+    #     ['hg-fast-export.sh', '-r', hg_repo_copy] + fast_export_args,
+    #     env=env,
+    #     cwd=git_repo,
+    # )
     subprocess.check_call(
-        ['sh', 'hg-fast-export.sh', '-r', hg_repo_copy] + fast_export_args,
+        ['hg-fast-export.sh', '-r', hg_repo_copy] + fast_export_args,
         env=env,
         cwd=git_repo,
     )
@@ -276,27 +281,27 @@ def main():
     try:
         arglist = sys.argv
         for i, arg in enumerate(arglist[:]):
-            if arg.startswith('--hg-user'):
+            if arg.startswith('hg-user'):
                 hg_user = arg.split("=", 1)[1]
                 j = arglist.index(arg)
                 del arglist[j]
-            elif arg.startswith('--hg-pass'):
+            elif arg.startswith('hg-pass'):
                 hg_password = arg.split("=", 1)[1]
                 j = arglist.index(arg)
                 del arglist[j]
-            elif arg.startswith('--git-user'):
+            elif arg.startswith('git-user'):
                 git_user = arg.split("=", 1)[1]
                 j = arglist.index(arg)
                 del arglist[j]
-            elif arg.startswith('--git-token'):
+            elif arg.startswith('git-token'):
                 git_token = arg.split("=", 1)[1]
                 j = arglist.index(arg)
                 del arglist[j]
-            elif arg.startswith('--git-repo'):
+            elif arg.startswith('git-repo'):
                 git_repo = arg.split("=", 1)[1]
                 j = arglist.index(arg)
                 del arglist[j]
-            elif arg.startswith('--hg-repo'):
+            elif arg.startswith('hg-repo'):
                 hg_repo = arg.split("=", 1)[1]
                 j = arglist.index(arg)
                 del arglist[j]
