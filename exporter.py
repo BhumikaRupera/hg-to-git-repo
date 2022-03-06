@@ -149,7 +149,7 @@ def convert(hg_repo_copy, git_repo, fast_export_args):
     #     cwd=git_repo,
     # )
     subprocess.check_call(
-        ['hg-fast-export.sh', '-r', hg_repo_copy] + fast_export_args,
+        ['sh', 'hg-fast-export.sh', '-r', hg_repo_copy] + fast_export_args,
         env=env,
         cwd=git_repo,
     )

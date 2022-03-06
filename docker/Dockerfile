@@ -23,6 +23,5 @@ ENV hgUser=$1 hgPass=$2 gitUser=$3 gitPat=$4 sourceUrl=$5 targetUrl=$6 copyHash=
 
 ENTRYPOINT ["python3", "/app/hg-to-git-repo/exporter.py", hgUser, hgPass, gitUser, gitPat, sourceUrl, targetUrl, copyHash]
 
-# CMD ["python3", "/app/hg-to-git-repo/exporter.py", hgUser, hgPass, gitUser, gitPat, sourceUrl, targetUrl, copyHash]
 
 
